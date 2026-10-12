@@ -4,7 +4,7 @@
   const FADE_MS = 350;
   // On SGBA, what a group draws is recorded once and replayed on later frames with the same key, without running the drawing code
   // again. In a browser the group is just drawn. A key must name everything the drawing depends on.
-  const grp = (key, draw) => g.__group ? g.__group(key, draw) : draw();
+  const grp = (key, draw) => { if (g.__group) return g.__group(key, draw); g.save(); try { draw(); } finally { g.restore(); } };
   let _gidSeq = 0;
   const gidOf = o => o.__gid || (o.__gid = ++_gidSeq);
   const groundY = sy => V.feetRow + camY + sy;                    // screen row of the ground line
@@ -31,12 +31,12 @@
   }
   function drawGrade() {
     const L = sceneLight();
-    g.save();
-    g.globalCompositeOperation = 'multiply';
-    const gr = g.createLinearGradient(0, 0, 0, V.h);
-    gr.addColorStop(0, L.grade); gr.addColorStop(0.55, '#ffffff'); gr.addColorStop(1, L.grade);
-    g.globalAlpha = L.ga; g.fillStyle = gr; g.fillRect(0, 0, V.w, V.h);
-    g.restore();
+    grp('gr' + L.grade + ',' + L.ga, () => {
+      g.globalCompositeOperation = 'multiply';
+      const gr = g.createLinearGradient(0, 0, 0, V.h);
+      gr.addColorStop(0, L.grade); gr.addColorStop(0.55, '#ffffff'); gr.addColorStop(1, L.grade);
+      g.globalAlpha = L.ga; g.fillStyle = gr; g.fillRect(0, 0, V.w, V.h);
+    });
   }
   // Filled oval made of solid rows, so it stays on the pixel grid (no antialiased arc).
   function pixOval(cx, cy, rx, ry, col, a) {
@@ -140,18 +140,17 @@
   // The bottom of a sprite, mirrored a few rows into wet ground. Called in the sprite's own transform (feet at dy+dh).
   function dampMirrorLocal(im, sx0, sw, sh, dx, dy, dw, dh, alpha) {
     if (!im || !alpha) return;
-    const feet = dy + dh, band = 12;
-    g.save();
-    g.beginPath(); g.rect(dx - 8, feet, dw + 16, band); g.clip();
-    g.globalAlpha = alpha; g.imageSmoothingEnabled = false;
-    for (let r = 0; r < band; r++) {
-      const srcY = Math.min(sh - 1, Math.max(0, sh - 1 - Math.floor(r * sh / Math.max(1, dh))));
-      const off = Math.round(Math.sin(r * 0.9 + clock * 0.004)) * 2;
-      g.drawImage(im, sx0, srcY, sw, 1, dx + off, feet + r, dw, 1);
-    }
-    g.restore();
+    const feet = dy + dh, band = 12, offs = [];
+    for (let r = 0; r < band; r++) offs.push(Math.round(Math.sin(r * 0.9 + clock * 0.004)) * 2);
+    grp('dm' + gidOf(im) + ',' + sx0 + ',' + sw + ',' + sh + ',' + dx + ',' + dy + ',' + dw + ',' + dh + ',' + alpha + ',' + offs.join(''), () => {
+      g.beginPath(); g.rect(dx - 8, feet, dw + 16, band); g.clip();
+      g.globalAlpha = alpha; g.imageSmoothingEnabled = false;
+      for (let r = 0; r < band; r++) {
+        const srcY = Math.min(sh - 1, Math.max(0, sh - 1 - Math.floor(r * sh / Math.max(1, dh))));
+        g.drawImage(im, sx0, srcY, sw, 1, dx + offs[r], feet + r, dw, 1);
+      }
+    });
   }
-
   function drawGeometry(sx, sy) {
     const Y = wy => Math.round(groundY(sy) - wy);
     const open = doorOpen(), gx = MAP_W - 10 + sx;

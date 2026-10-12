@@ -104,21 +104,23 @@
   function castShadow(sil, dx, dy, groundY, L, alpha) {
     const sx = L.sx + (L.flick ? Math.sin(clock * 0.011) * 0.15 : 0), sy = L.sy;
     const lay = c => { c.imageSmoothingEnabled = false; c.setTransform(1, 0, -sx, -sy, sx * groundY, groundY * (1 + sy)); c.drawImage(sil, dx, dy); c.setTransform(1, 0, 0, 1, 0, 0); };
-    g.save();
     let shade = (L.a || 0.35) * (alpha == null ? 1 : alpha);
     if (L.flick) shade *= 0.72 + 0.28 * (0.5 + 0.5 * Math.sin(clock * 0.017));
-    g.globalAlpha = shade;
-    if (L.clip) { g.beginPath(); L.clip.forEach((p, i) => i ? g.lineTo(p[0], p[1]) : g.moveTo(p[0], p[1])); g.closePath(); g.clip(); }   // cut off at a cliff edge
-    if (L.steps) {                                                // stairs: each tread the shadow climbs lifts it a little, in a hard step
-      const c = _scratch.getContext('2d'); c.clearRect(0, 0, 640, 480); c.imageSmoothingEnabled = false; lay(c);
-      const ys = L.steps;
-      for (let k = 0; k < ys.length; k++) {
-        const top = k + 1 < ys.length ? ys[k + 1] : 0, bot = k === 0 ? 480 : ys[k];
-        const sh = bot - top; if (sh <= 0) continue;
-        g.drawImage(_scratch, 0, top, 640, sh, 0, top - k * (L.stepDy || 3), 640, sh);
-      }
-    } else lay(g);
-    g.restore();
+    const paint = () => {
+      g.globalAlpha = shade;
+      if (L.clip) { g.beginPath(); L.clip.forEach((p, i) => i ? g.lineTo(p[0], p[1]) : g.moveTo(p[0], p[1])); g.closePath(); g.clip(); }   // cut off at a cliff edge
+      if (L.steps) {                                                // stairs: each tread the shadow climbs lifts it a little, in a hard step
+        const c = _scratch.getContext('2d'); c.clearRect(0, 0, 640, 480); c.imageSmoothingEnabled = false; lay(c);
+        const ys = L.steps;
+        for (let k = 0; k < ys.length; k++) {
+          const top = k + 1 < ys.length ? ys[k + 1] : 0, bot = k === 0 ? 480 : ys[k];
+          const sh = bot - top; if (sh <= 0) continue;
+          g.drawImage(_scratch, 0, top, 640, sh, 0, top - k * (L.stepDy || 3), 640, sh);
+        }
+      } else lay(g);
+    };
+    if (L.steps) { g.save(); paint(); g.restore(); return; }          // (the stair case draws through a shared scratch canvas: never replayed)
+    grp('sd' + gidOf(sil) + ',' + dx + ',' + dy + ',' + groundY + ',' + sx + ',' + sy + ',' + shade + ',' + (L.clip ? L.clip.join(';') : ''), paint);
   }
 
   // Perry: real idle sprite, feet at (X, Y). Optional sit lowers her a little.
