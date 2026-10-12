@@ -2,6 +2,11 @@
   // ------------------------------------------------------------------ drawing: level scenery, crates, banners
   let fadeUntil = 0;
   const FADE_MS = 350;
+  // On SGBA, what a group draws is recorded once and replayed on later frames with the same key, without running the drawing code
+  // again. In a browser the group is just drawn. A key must name everything the drawing depends on.
+  const grp = (key, draw) => g.__group ? g.__group(key, draw) : draw();
+  let _gidSeq = 0;
+  const gidOf = o => o.__gid || (o.__gid = ++_gidSeq);
   const groundY = sy => V.feetRow + camY + sy;                    // screen row of the ground line
   // One light per backdrop. sx leans the shadow (+ right), sy lays it toward the viewer (+) or away (-).
   // grade/ga is a vertical multiply on the background. water is a damp reflection under the feet (0 means none).
@@ -36,13 +41,14 @@
   // Filled oval made of solid rows, so it stays on the pixel grid (no antialiased arc).
   function pixOval(cx, cy, rx, ry, col, a) {
     rx = Math.max(1, Math.round(rx)); ry = Math.max(1, Math.round(ry));
-    g.save(); g.globalAlpha = a; g.fillStyle = col; g.imageSmoothingEnabled = false;
-    for (let y = -ry; y <= ry; y++) {
-      const t = 1 - (y * y) / (ry * ry); if (t <= 0) continue;
-      const w = Math.max(1, Math.round(rx * Math.sqrt(t)));
-      g.fillRect(cx - w, cy + y, w * 2, 1);
-    }
-    g.restore();
+    grp('ov' + cx + ',' + cy + ',' + rx + ',' + ry + ',' + col + ',' + a, () => {
+      g.globalAlpha = a; g.fillStyle = col; g.imageSmoothingEnabled = false;
+      for (let y = -ry; y <= ry; y++) {
+        const t = 1 - (y * y) / (ry * ry); if (t <= 0) continue;
+        const w = Math.max(1, Math.round(rx * Math.sqrt(t)));
+        g.fillRect(cx - w, cy + y, w * 2, 1);
+      }
+    });
   }
   // A 2 px ring, used wherever a soft radial glow used to be.
   function pixGlow(cx, cy, r, col, a) {
@@ -148,48 +154,56 @@
 
   function drawGeometry(sx, sy) {
     const Y = wy => Math.round(groundY(sy) - wy);
-    for (const s of curMap.solids) {                              // barriers: stone blocks
-      const x0 = Math.round(s.x0 + sx), w = s.x1 - s.x0, top = Y(s.top), bot = Y(0);
-      g.fillStyle = '#3d3949'; g.fillRect(x0, top, w, bot - top + 12);
-      g.fillStyle = '#2b2735';
-      for (let yy = top + 8; yy < bot + 12; yy += 8) g.fillRect(x0, yy, w, 1);
-      for (let yy = top, r = 0; yy < bot + 12; yy += 8, r++) g.fillRect(x0 + (r % 2 ? 4 : 10), yy, 1, 8);
-      g.fillStyle = '#635e7a'; g.fillRect(x0, top, w, 3);
-      g.strokeStyle = '#111'; g.lineWidth = 1; g.strokeRect(x0 + 0.5, top + 0.5, w - 1, bot - top + 11);
+    const open = doorOpen(), gx = MAP_W - 10 + sx;
+    // the stone, the planks and the door's bars only change with the map, the camera height, the shake and the door
+    grp('geo' + gidOf(curMap) + ',' + groundY(sy) + ',' + sx + ',' + open, () => {
+      for (const s of curMap.solids) {                              // barriers: stone blocks
+        const x0 = Math.round(s.x0 + sx), w = s.x1 - s.x0, top = Y(s.top), bot = Y(0);
+        g.fillStyle = '#3d3949'; g.fillRect(x0, top, w, bot - top + 12);
+        g.fillStyle = '#2b2735';
+        for (let yy = top + 8; yy < bot + 12; yy += 8) g.fillRect(x0, yy, w, 1);
+        for (let yy = top, r = 0; yy < bot + 12; yy += 8, r++) g.fillRect(x0 + (r % 2 ? 4 : 10), yy, 1, 8);
+        g.fillStyle = '#635e7a'; g.fillRect(x0, top, w, 3);
+        g.strokeStyle = '#111'; g.lineWidth = 1; g.strokeRect(x0 + 0.5, top + 0.5, w - 1, bot - top + 11);
+      }
+      for (const p of curMap.plats) {                               // platforms: a plank on two posts
+        const x0 = Math.round(p.x0 + sx), w = p.x1 - p.x0, top = Y(p.top), bot = Y(0);
+        g.fillStyle = 'rgba(58,38,22,0.75)';
+        g.fillRect(x0 + 4, top + 7, 3, bot - top - 7); g.fillRect(x0 + w - 7, top + 7, 3, bot - top - 7);
+        g.fillStyle = '#7a5230'; g.fillRect(x0, top, w, 7);
+        g.fillStyle = '#b07c44'; g.fillRect(x0, top, w, 2);
+        g.fillStyle = '#4a3018'; g.fillRect(x0, top + 6, w, 1);
+        g.fillStyle = '#2a1a0c'; for (let nx = x0 + 6; nx < x0 + w - 3; nx += 16) g.fillRect(nx, top + 3, 2, 2);
+        g.strokeStyle = '#111'; g.strokeRect(x0 + 0.5, top + 0.5, w - 1, 6);
+      }
+      // the door at the right edge: barred while an enemy is alive, a green glow and arrow once the map is clear
+      g.fillStyle = open ? 'rgba(90,220,120,0.35)' : 'rgba(30,30,40,0.85)';
+      g.fillRect(gx, Y(70), 10, Y(0) - Y(70));
+      if (!open) { g.fillStyle = '#8a8a99'; for (let yy = Y(70); yy < Y(0); yy += 6) g.fillRect(gx + 2, yy, 6, 2); }
+    });
+    if (open) {
+      const pulse = 0.55 + 0.35 * Math.sin(clock / 260);
+      g.save(); g.globalAlpha = pulse; g.fillStyle = '#7dff9a'; g.beginPath(); g.moveTo(gx - 4, Y(28) - 7); g.lineTo(gx + 5, Y(28)); g.lineTo(gx - 4, Y(28) + 7); g.closePath(); g.fill(); g.restore();
     }
-    for (const p of curMap.plats) {                               // platforms: a plank on two posts
-      const x0 = Math.round(p.x0 + sx), w = p.x1 - p.x0, top = Y(p.top), bot = Y(0);
-      g.fillStyle = 'rgba(58,38,22,0.75)';
-      g.fillRect(x0 + 4, top + 7, 3, bot - top - 7); g.fillRect(x0 + w - 7, top + 7, 3, bot - top - 7);
-      g.fillStyle = '#7a5230'; g.fillRect(x0, top, w, 7);
-      g.fillStyle = '#b07c44'; g.fillRect(x0, top, w, 2);
-      g.fillStyle = '#4a3018'; g.fillRect(x0, top + 6, w, 1);
-      g.fillStyle = '#2a1a0c'; for (let nx = x0 + 6; nx < x0 + w - 3; nx += 16) g.fillRect(nx, top + 3, 2, 2);
-      g.strokeStyle = '#111'; g.strokeRect(x0 + 0.5, top + 0.5, w - 1, 6);
-    }
-    // the door at the right edge: barred while an enemy is alive, a green glow and arrow once the map is clear
-    const open = doorOpen(), pulse = 0.55 + 0.35 * Math.sin(clock / 260), gx = MAP_W - 10 + sx;
-    g.fillStyle = open ? 'rgba(90,220,120,0.35)' : 'rgba(30,30,40,0.85)';
-    g.fillRect(gx, Y(70), 10, Y(0) - Y(70));
-    if (!open) { g.fillStyle = '#8a8a99'; for (let yy = Y(70); yy < Y(0); yy += 6) g.fillRect(gx + 2, yy, 6, 2); }
-    else { g.save(); g.globalAlpha = pulse; g.fillStyle = '#7dff9a'; g.beginPath(); g.moveTo(gx - 4, Y(28) - 7); g.lineTo(gx + 5, Y(28)); g.lineTo(gx - 4, Y(28) + 7); g.closePath(); g.fill(); g.restore(); }
   }
   function drawCrates(sx, sy) {
     for (const c of curMap.crates) {
       if (c.broken) continue;
       const X = Math.round(c.x + sx), Y = Math.round(groundY(sy) - c.fy), gold = !!c.item;
       if (X < -90 || X > V.w + 90) continue;                     // off screen
-      if (!(c.fy < 2 && inPit(c.x))) contactBlob(X, Y, Math.round(8 * CRATE_SCALE), 0, false);
+      const blob = !(c.fy < 2 && inPit(c.x));
+      if (blob) contactBlob(X, Y, Math.round(8 * CRATE_SCALE), 0, false);
       if (gold) pixGlow(X, Y - 9 * CRATE_SCALE, Math.round(12 * CRATE_SCALE), '#ffd24a', 0.55 + 0.25 * Math.sin(clock / 220));
-      g.save(); g.translate(X, Y); g.scale(CRATE_SCALE, CRATE_SCALE);      // drawn on a 20 x 19 grid, then scaled up to the crate's real size
-      g.fillStyle = '#000'; g.fillRect(-10, -19, 20, 19);
-      g.fillStyle = gold ? '#c9962a' : '#8a5a2b'; g.fillRect(-9, -18, 18, 17);
-      g.fillStyle = gold ? '#f0cf66' : '#b07a3c'; g.fillRect(-9, -18, 18, 2);
-      g.strokeStyle = gold ? '#7a5a10' : '#5a3a18'; g.lineWidth = 1;
-      g.beginPath(); g.moveTo(-8, -17); g.lineTo(8, -2); g.moveTo(8, -17); g.lineTo(-8, -2); g.stroke();
-      g.strokeRect(-8.5, -17.5, 17, 16);
-      if (gold) { g.font = 'bold 9px monospace'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = '#fff'; g.strokeStyle = '#000'; g.lineWidth = 2; g.strokeText('?', 0, -10); g.fillText('?', 0, -10); g.textAlign = 'left'; }
-      g.restore();
+      grp('cr' + X + ',' + Y + ',' + gold, () => {
+        g.translate(X, Y); g.scale(CRATE_SCALE, CRATE_SCALE);      // drawn on a 20 x 19 grid, then scaled up to the crate's real size
+        g.fillStyle = '#000'; g.fillRect(-10, -19, 20, 19);
+        g.fillStyle = gold ? '#c9962a' : '#8a5a2b'; g.fillRect(-9, -18, 18, 17);
+        g.fillStyle = gold ? '#f0cf66' : '#b07a3c'; g.fillRect(-9, -18, 18, 2);
+        g.strokeStyle = gold ? '#7a5a10' : '#5a3a18'; g.lineWidth = 1;
+        g.beginPath(); g.moveTo(-8, -17); g.lineTo(8, -2); g.moveTo(8, -17); g.lineTo(-8, -2); g.stroke();
+        g.strokeRect(-8.5, -17.5, 17, 16);
+        if (gold) { g.font = 'bold 9px monospace'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = '#fff'; g.strokeStyle = '#000'; g.lineWidth = 2; g.strokeText('?', 0, -10); g.fillText('?', 0, -10); g.textAlign = 'left'; }
+      });
     }
   }
   function drawFlashes(sx, sy) {
@@ -290,32 +304,40 @@
   }
   // meters under the health bar: ENG (blue) and EMP (orange); a bar flashes white when a move was refused
   function drawMeters() {
-    g.font = 'bold 7px monospace'; g.textBaseline = 'top'; g.textAlign = 'left'; g.lineWidth = 2; g.lineJoin = 'round';
-    let y = 34;                                                    // only the meters the player has unlocked are drawn
-    for (const [lab, k, v, max, col] of [['ENG', 'energy', energyMeter, maxOf('energy'), '#4af'], ['EMP', 'empower', empowerMeter, maxOf('empower'), '#fa4'], ['SUP', 'super', superMeter, maxOf('super'), '#c6f']]) {
-      if (!P.meterOn(k)) continue;
-      g.strokeStyle = '#000'; g.fillStyle = '#fff';
-      g.strokeText(lab, 8, y - 1); g.fillText(lab, 8, y - 1);
-      const flash = clock < meterFlash[k];
-      g.fillStyle = '#000'; g.fillRect(27, y - 1, max + 2, 8);          // the bar is as long as the meter's maximum: upgrades make it longer
-      g.fillStyle = '#16202e'; g.fillRect(28, y, max, 6);
-      const fw = Math.max(0, Math.min(max, Math.round(v)));
-      g.fillStyle = flash && Math.floor(clock / 70) % 2 ? '#fff' : col; g.fillRect(28, y, fw, 6);
-      g.fillStyle = 'rgba(255,255,255,0.35)'; g.fillRect(28, y, fw, 1);
-      const t = `${Math.round(v)}/${max}`;
-      g.strokeStyle = '#000'; g.fillStyle = '#fff'; g.strokeText(t, 32 + max, y - 1); g.fillText(t, 32 + max, y - 1);
-      y += 9;
-    }
+    const rows = [['ENG', 'energy', energyMeter, maxOf('energy'), '#4af'], ['EMP', 'empower', empowerMeter, maxOf('empower'), '#fa4'], ['SUP', 'super', superMeter, maxOf('super'), '#c6f']];
+    let key = 'mt';
+    for (const [, k, v, max] of rows) if (P.meterOn(k)) key += `|${k},${Math.round(v)},${max},${clock < meterFlash[k] && Math.floor(clock / 70) % 2 ? 1 : 0}`;
+    if (key === 'mt') return;
+    grp(key, () => {
+      g.font = 'bold 7px monospace'; g.textBaseline = 'top'; g.textAlign = 'left'; g.lineWidth = 2; g.lineJoin = 'round';
+      let y = 34;                                                    // only the meters the player has unlocked are drawn
+      for (const [lab, k, v, max, col] of rows) {
+        if (!P.meterOn(k)) continue;
+        g.strokeStyle = '#000'; g.fillStyle = '#fff';
+        g.strokeText(lab, 8, y - 1); g.fillText(lab, 8, y - 1);
+        const flash = clock < meterFlash[k];
+        g.fillStyle = '#000'; g.fillRect(27, y - 1, max + 2, 8);          // the bar is as long as the meter's maximum: upgrades make it longer
+        g.fillStyle = '#16202e'; g.fillRect(28, y, max, 6);
+        const fw = Math.max(0, Math.min(max, Math.round(v)));
+        g.fillStyle = flash && Math.floor(clock / 70) % 2 ? '#fff' : col; g.fillRect(28, y, fw, 6);
+        g.fillStyle = 'rgba(255,255,255,0.35)'; g.fillRect(28, y, fw, 1);
+        const t = `${Math.round(v)}/${max}`;
+        g.strokeStyle = '#000'; g.fillStyle = '#fff'; g.strokeText(t, 32 + max, y - 1); g.fillText(t, 32 + max, y - 1);
+        y += 9;
+      }
+    });
   }
 
   // health bars: hers at the top left of the view, each living enemy's over its head
   function bar(x0, y0, w, h, frac) {
-    g.fillStyle = '#000'; g.fillRect(x0 - 1, y0 - 1, w + 2, h + 2);
-    g.fillStyle = '#4a1414'; g.fillRect(x0, y0, w, h);
-    const fw = Math.round(w * Math.max(0, Math.min(1, frac)));
-    g.fillStyle = frac > 0.5 ? '#3ddc5f' : frac > 0.25 ? '#f0c030' : '#e63b2e';
-    g.fillRect(x0, y0, fw, h);
-    g.fillStyle = 'rgba(255,255,255,0.35)'; g.fillRect(x0, y0, fw, 1);
+    grp('bar' + x0 + ',' + y0 + ',' + w + ',' + h + ',' + frac, () => {
+      g.fillStyle = '#000'; g.fillRect(x0 - 1, y0 - 1, w + 2, h + 2);
+      g.fillStyle = '#4a1414'; g.fillRect(x0, y0, w, h);
+      const fw = Math.round(w * Math.max(0, Math.min(1, frac)));
+      g.fillStyle = frac > 0.5 ? '#3ddc5f' : frac > 0.25 ? '#f0c030' : '#e63b2e';
+      g.fillRect(x0, y0, fw, h);
+      g.fillStyle = 'rgba(255,255,255,0.35)'; g.fillRect(x0, y0, fw, 1);
+    });
   }
   function drawBars(sx, sy) {
     const X = wx => V.anchorX + (wx - camX) + sx, Y = wy => V.feetRow + camY + sy - wy;
@@ -324,26 +346,28 @@
       if (!b || EN[e.type].ai.boss || EN[e.type].ai.prop) continue;
       bar(Math.round(X((b[0] + b[2]) / 2)) - 15, Math.round(Y(b[3])) - 8, 30, 3, e.hp / e.maxHp);
     }
-    g.font = 'bold 7px monospace'; g.textBaseline = 'top'; g.lineWidth = 2; g.lineJoin = 'round';
-    g.strokeStyle = '#000'; g.fillStyle = '#fff';
-    g.strokeText('MAX', 8, 14); g.fillText('MAX', 8, 14);
-    const healthW = Math.min(320, V.w - 300);
-    bar(28, 15, healthW, 8, hp / maxHp());
-    if (level) {                                                     // Leaves counter
-      const IT = D.items, leafX = V.w - 152; g.drawImage(img[IT.leaf].im, 0, 0, IT.cell, IT.cell, leafX, 12, 16, 16);
-      g.strokeText('x' + P.state.leaves, leafX + 18, 14); g.fillText('x' + P.state.leaves, leafX + 18, 14);
-    }
-    if (level && level.n > 0) {                                      // ankh counter
-      drawAnkh(V.w - 74, 20, 1.0);
-      g.strokeText('x' + P.state.ankhs, V.w - 58, 14); g.fillText('x' + P.state.ankhs, V.w - 58, 14);
-    }
-    const bo = enemies.find(e => EN[e.type].ai.boss && alive(e));
-    if (bo) {                                                         // boss bar along the bottom
-      g.textAlign = 'center'; g.strokeText(EN[bo.type].ai.bossName || EN[bo.type].title, V.w / 2, V.h - 34); g.fillText(EN[bo.type].ai.bossName || EN[bo.type].title, V.w / 2, V.h - 34); g.textAlign = 'left';
-      bar(64, V.h - 24, V.w - 128, 8, bo.hp / bo.maxHp);
-    }
-    const t = `${hp}/${maxHp()}`;
-    g.strokeText(t, 34 + healthW, 14); g.fillText(t, 34 + healthW, 14);
+    const healthW = Math.min(320, V.w - 300), mh = maxHp(), bo = enemies.find(e => EN[e.type].ai.boss && alive(e));
+    // the top-of-screen readout only changes when one of these numbers does
+    grp(`hud${hp},${mh},${level ? P.state.leaves : -1},${level && level.n > 0 ? P.state.ankhs : -1},${bo ? EN[bo.type].ai.bossName || EN[bo.type].title : ''},${bo ? bo.hp + '/' + bo.maxHp : ''}`, () => {
+      g.font = 'bold 7px monospace'; g.textBaseline = 'top'; g.lineWidth = 2; g.lineJoin = 'round';
+      g.strokeStyle = '#000'; g.fillStyle = '#fff';
+      g.strokeText('MAX', 8, 14); g.fillText('MAX', 8, 14);
+      bar(28, 15, healthW, 8, hp / mh);
+      if (level) {                                                     // Leaves counter
+        const IT = D.items, leafX = V.w - 152; g.drawImage(img[IT.leaf].im, 0, 0, IT.cell, IT.cell, leafX, 12, 16, 16);
+        g.strokeText('x' + P.state.leaves, leafX + 18, 14); g.fillText('x' + P.state.leaves, leafX + 18, 14);
+      }
+      if (level && level.n > 0) {                                      // ankh counter
+        drawAnkh(V.w - 74, 20, 1.0);
+        g.strokeText('x' + P.state.ankhs, V.w - 58, 14); g.fillText('x' + P.state.ankhs, V.w - 58, 14);
+      }
+      if (bo) {                                                         // boss bar along the bottom
+        g.textAlign = 'center'; g.strokeText(EN[bo.type].ai.bossName || EN[bo.type].title, V.w / 2, V.h - 34); g.fillText(EN[bo.type].ai.bossName || EN[bo.type].title, V.w / 2, V.h - 34); g.textAlign = 'left'
+        bar(64, V.h - 24, V.w - 128, 8, bo.hp / bo.maxHp);
+      }
+      const t = `${hp}/${mh}`;
+      g.strokeText(t, 34 + healthW, 14); g.fillText(t, 34 + healthW, 14);
+    });
   }
   function drawFloaters(sx, sy) {
     const X = wx => V.anchorX + (wx - camX) + sx, Y = wy => V.feetRow + camY + sy - wy;

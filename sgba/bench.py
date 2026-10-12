@@ -30,9 +30,12 @@ SCENES = {
 }
 
 
+DEVICE = {"zip": None, "mem": 640}      # set by --device: run inside the ARM bundle under QEMU instead of natively
+
+
 def run_scene(engine: Path, name: str, repeats: int = 3) -> dict:
     """Best of a few runs: other work on the machine only ever makes a run slower."""
-    runs = [run_once(engine, name) for _ in range(repeats)]
+    runs = [run_once(engine, name) for _ in range(1 if DEVICE["zip"] else repeats)]
     return min(runs, key=lambda r: r["avg_ms"])
 
 
@@ -43,6 +46,11 @@ def run_once(engine: Path, name: str) -> dict:
                "--json", str(out), "--script", script or "9999:a"]
     for item in js:
         command += ["--js", item]
+    if DEVICE["zip"]:
+        sys.path.insert(0, str(engine / "tools"))
+        import device_sim
+        device_sim.run(Path(DEVICE["zip"]), command[3:], DEVICE["mem"], "0", game=str(REPO / "web"))
+        return json.loads(out.read_text())
     env = dict(os.environ, SDL_VIDEODRIVER="dummy", SDL_AUDIODRIVER="dummy")
     subprocess.run(command, check=True, env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     return json.loads(out.read_text())
@@ -53,7 +61,10 @@ def main() -> int:
     parser.add_argument("--scenes", nargs="*", default=list(SCENES))
     parser.add_argument("--save", help="store results as .bench/<name>.json")
     parser.add_argument("--compare", help="compare with .bench/<name>.json")
+    parser.add_argument("--device", help="ArkOS bundle zip: run the scenes in it under QEMU (ARM, one core, limited memory) as a stand-in for the R36S")
+    parser.add_argument("--mem", type=int, default=640, help="address space limit in MB for --device")
     args = parser.parse_args()
+    DEVICE["zip"], DEVICE["mem"] = args.device, args.mem
     engine = engine_dir()
     results = {name: run_scene(engine, name) for name in args.scenes}
     base = {}

@@ -130,12 +130,14 @@
     for (const b of curMap.bombs) {
       if (b.gone) continue;
       const X = Math.round(b.x + sx), Y = Math.round(groundY(sy) - b.fy), lit = !!b.fuse;
-      g.fillStyle = '#000'; g.beginPath(); g.arc(X, Y - 6, 7, 0, Math.PI * 2); g.fill();
-      g.fillStyle = '#2b2b33'; g.beginPath(); g.arc(X, Y - 6, 6, 0, Math.PI * 2); g.fill();
-      g.fillStyle = '#5a5a68'; g.fillRect(X - 3, Y - 10, 2, 2);
-      g.strokeStyle = '#8a6a3a'; g.lineWidth = 1; g.beginPath(); g.moveTo(X + 2, Y - 12); g.lineTo(X + 5, Y - 16); g.stroke();
       const on = lit ? Math.floor(clock / 50) % 2 : Math.floor(clock / 240) % 2;   // the fuse spark blinks
-      g.fillStyle = on ? '#ffe14d' : '#ff6a20'; g.fillRect(X + 4, Y - 18, 3, 3);
+      grp('bm' + X + ',' + Y + ',' + on, () => {
+        g.fillStyle = '#000'; g.beginPath(); g.arc(X, Y - 6, 7, 0, Math.PI * 2); g.fill();
+        g.fillStyle = '#2b2b33'; g.beginPath(); g.arc(X, Y - 6, 6, 0, Math.PI * 2); g.fill();
+        g.fillStyle = '#5a5a68'; g.fillRect(X - 3, Y - 10, 2, 2);
+        g.strokeStyle = '#8a6a3a'; g.lineWidth = 1; g.beginPath(); g.moveTo(X + 2, Y - 12); g.lineTo(X + 5, Y - 16); g.stroke();
+        g.fillStyle = on ? '#ffe14d' : '#ff6a20'; g.fillRect(X + 4, Y - 18, 3, 3);
+      });
       if (lit) pixGlow(X, Y - 6, 9, '#ff2b2b', 0.7);
     }
   }
