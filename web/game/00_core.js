@@ -119,6 +119,7 @@
   const BASE_MOVES = new Set(['idle', 'walk_right', 'walk_left', 'duck', 'block', 'parry', 'jump', 'dash', 'slash', 'spin_attack']);
   const moveOpen = move => BASE_MOVES.has(move) || P.hasMove(move);
   const SPRITE_SCALE = 1.0;
+  const CRATE_SCALE = 2.8;           // a crate is as wide as Perry's feet are far apart (her boots are about 56 px apart, centre to centre); the old 20 px crate was far too small
   if (D.moves.beam_plasma) D.moves.beam_plasma.title = 'Empowerment Beam';
   if (D.moves.jump) D.moves.jump.title = 'Jump (floaty; hold Left or Right to steer)';
   // Energy (blue) and empower (orange) meters. Gems dropped by defeated enemies fill them: taunted enemies

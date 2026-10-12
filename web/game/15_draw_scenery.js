@@ -178,15 +178,18 @@
     for (const c of curMap.crates) {
       if (c.broken) continue;
       const X = Math.round(c.x + sx), Y = Math.round(groundY(sy) - c.fy), gold = !!c.item;
-      if (!(c.fy < 2 && inPit(c.x))) contactBlob(X, Y, 8, 0, false);
-      if (gold) pixGlow(X, Y - 9, 12, '#ffd24a', 0.55 + 0.25 * Math.sin(clock / 220));
-      g.fillStyle = '#000'; g.fillRect(X - 10, Y - 19, 20, 19);
-      g.fillStyle = gold ? '#c9962a' : '#8a5a2b'; g.fillRect(X - 9, Y - 18, 18, 17);
-      g.fillStyle = gold ? '#f0cf66' : '#b07a3c'; g.fillRect(X - 9, Y - 18, 18, 2);
+      if (X < -90 || X > V.w + 90) continue;                     // off screen
+      if (!(c.fy < 2 && inPit(c.x))) contactBlob(X, Y, Math.round(8 * CRATE_SCALE), 0, false);
+      if (gold) pixGlow(X, Y - 9 * CRATE_SCALE, Math.round(12 * CRATE_SCALE), '#ffd24a', 0.55 + 0.25 * Math.sin(clock / 220));
+      g.save(); g.translate(X, Y); g.scale(CRATE_SCALE, CRATE_SCALE);      // drawn on a 20 x 19 grid, then scaled up to the crate's real size
+      g.fillStyle = '#000'; g.fillRect(-10, -19, 20, 19);
+      g.fillStyle = gold ? '#c9962a' : '#8a5a2b'; g.fillRect(-9, -18, 18, 17);
+      g.fillStyle = gold ? '#f0cf66' : '#b07a3c'; g.fillRect(-9, -18, 18, 2);
       g.strokeStyle = gold ? '#7a5a10' : '#5a3a18'; g.lineWidth = 1;
-      g.beginPath(); g.moveTo(X - 8, Y - 17); g.lineTo(X + 8, Y - 2); g.moveTo(X + 8, Y - 17); g.lineTo(X - 8, Y - 2); g.stroke();
-      g.strokeRect(X - 8.5, Y - 17.5, 17, 16);
-      if (gold) { g.font = 'bold 9px monospace'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = '#fff'; g.strokeStyle = '#000'; g.lineWidth = 2; g.strokeText('?', X, Y - 10); g.fillText('?', X, Y - 10); g.textAlign = 'left'; }
+      g.beginPath(); g.moveTo(-8, -17); g.lineTo(8, -2); g.moveTo(8, -17); g.lineTo(-8, -2); g.stroke();
+      g.strokeRect(-8.5, -17.5, 17, 16);
+      if (gold) { g.font = 'bold 9px monospace'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = '#fff'; g.strokeStyle = '#000'; g.lineWidth = 2; g.strokeText('?', 0, -10); g.fillText('?', 0, -10); g.textAlign = 'left'; }
+      g.restore();
     }
   }
   function drawFlashes(sx, sy) {
@@ -264,6 +267,7 @@
       const left = GEM_LIFE - (clock - gm.t0);
       if (gm.kind !== 'ankh' && left < 4000 && Math.floor(clock / 120) % 2) continue;
       const X = Math.round(V.anchorX + (gm.x - camX) + sx), Y = Math.round(V.feetRow + camY + sy - gm.y - Math.sin(gm.bob) * 3);
+      if (X < -32 || X > V.w + 32) continue;                     // off screen: nothing to draw
       if (gm.kind === 'ankh') { drawAnkh(X, Y, 1); continue; }
       const IT = D.items, up = gm.kind.startsWith('up_'), base = up ? gm.kind.slice(3) : gm.kind;
       if (gm.kind === 'leaf') {                                   // the spinning Leaf coin (a 5-leaf piece is drawn larger)

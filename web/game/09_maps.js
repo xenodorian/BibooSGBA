@@ -163,19 +163,19 @@
   }
 
   // crates: any of her attacks that touches one smashes it. A golden crate holds an unlock; a plain one may drop a gem.
-  const crateBox = c => [c.x - 9, c.fy, c.x + 9, c.fy + 18];
+  const crateBox = c => [c.x - 9 * CRATE_SCALE, c.fy, c.x + 9 * CRATE_SCALE, c.fy + 18 * CRATE_SCALE];
   function burst(wx, wy, n, colors) {
     for (let i = 0; i < n; i++) particles.push({ wx, wy, vx: (Math.random() - 0.5) * 0.22, vy: 0.04 + Math.random() * 0.16, t0: clock, life: 500 + Math.random() * 300, c: colors[i % colors.length] });
   }
   function breakCrate(c) {
     if (c.broken) return;
     c.broken = true; level.broken.add(c.key);
-    burst(c.x, c.fy + 9, 9, c.loot ? ['#e8c050', '#c9962a', '#fff2a0'] : ['#8a5a2b', '#6b4420', '#b07a3c']);
-    if (c.loot === 'ankh') { spawnGem(c.x, 'ankh', c.fy); floater(c.x, c.fy + 26, 'ANKH', '#ffd24a'); return; }
+    burst(c.x, c.fy + 9 * CRATE_SCALE, 9, c.loot ? ['#e8c050', '#c9962a', '#fff2a0'] : ['#8a5a2b', '#6b4420', '#b07a3c']);
+    if (c.loot === 'ankh') { spawnGem(c.x, 'ankh', c.fy); floater(c.x, c.fy + 18 * CRATE_SCALE + 8, 'ANKH', '#ffd24a'); return; }
     if (c.loot && c.loot.startsWith('leaves:')) {                    // a cache: a shower of leaves, the big ones worth 5
       let n = +c.loot.split(':')[1]; const big = Math.floor(n / 5), small = n - big * 5, pieces = [...Array(big).fill(5), ...Array(small).fill(1)];
       pieces.forEach((v, k) => { const side = (k % 2 ? 1 : -1) * (6 + Math.floor(k / 2) * 6); gems.push({ x: c.x + Math.max(-60, Math.min(60, side)), y: c.fy + 14 + (k % 3) * 7, fy: c.fy, kind: 'leaf', val: v, bob: Math.random() * 6.28, t0: clock }); });
-      burst(c.x, c.fy + 14, 14, ['#ffd24a', '#fff2a0', '#c9962a']); floater(c.x, c.fy + 26, n + ' LEAVES', '#ffd24a');
+      burst(c.x, c.fy + 14 * CRATE_SCALE, 14, ['#ffd24a', '#fff2a0', '#c9962a']); floater(c.x, c.fy + 18 * CRATE_SCALE + 8, n + ' LEAVES', '#ffd24a');
     }
     {                                            // every crate drops something useful: a health gem, a meter gem, or a +25 meter upgrade
       const pool = lootPool();
