@@ -1,0 +1,64 @@
+name: Deploy game to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Install web build dependencies
+        run: python -m pip install -r requirements.txt
+      - name: Prepare native 640x480 story assets
+        run: python tools/prepare_story_assets.py
+      # The generated art (web/assets: sprite sheets, background layers, data.js) is committed to the repo, so ordinary game code
+      # edits publish those files as they are. The slow rebuild runs only when the art code or its tools changed, or on a manual run.
+      # After changing art code, run `python -m swingkit --web` locally and commit web/assets so the repo and the deploy match.
+      - name: Decide whether the art needs rebuilding
+        id: art
+        run: |
+          rebuild=false
+          before="${{ github.event.before }}"
+          if [ "${{ github.event_name }}" != "push" ] || [ -z "$before" ] || echo "$before" | grep -Eq '^0+$' || ! git cat-file -e "$before^{commit}" 2>/dev/null; then
+            rebuild=true
+          elif git diff --name-only "$before" "${{ github.sha }}" | grep -Eq '^(swingkit/|tools/|requirements\.txt|\.github/workflows/pages\.yml)'; then
+            rebuild=true
+          fi
+          echo "art rebuild: $rebuild"
+          echo "rebuild=$rebuild" >> "$GITHUB_OUTPUT"
+      - name: Build native web assets
+        if: steps.art.outputs.rebuild == 'true'
+        run: python -m swingkit --web
+      - uses: actions/configure-pages@v5
+        with:
+          enablement: true
+      # Publish the same layout as the branch based Pages build (the site root is the repo root: a redirect
+      # page at / and the game at /web/). The two deployments race, and if this one published only the web
+      # folder as the site root, /web/ would 404 whenever this one finished last.
+      - name: Assemble the site
+        run: |
+          mkdir _site
+          cp -r web _site/web
+          cp index.html .nojekyll _site/
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+      - id: deployment
+        uses: actions/deploy-pages@v4

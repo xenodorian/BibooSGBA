@@ -1,0 +1,9 @@
+out/
+build/
+dist/
+__pycache__/
+*.pyc
+.pytest_cache/
+creature_shot.png
+boss_shot.png
+node_modules/
