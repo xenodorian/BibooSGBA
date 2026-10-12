@@ -77,15 +77,18 @@
     meditate: { pan: 0,    x: Math.round(104 * STORY_X_SCALE), gy: Math.round(178 * STORY_Y_SCALE), s: 1.0, L: LOW_SUN },
     sunrise:  { pan: 0,    x: Math.round(104 * STORY_X_SCALE), gy: Math.round(178 * STORY_Y_SCALE), s: 1.0, L: LOW_SUN },
   };
+  // The scene pictures are wide panoramas 216 px tall, drawn for a 384x216 view that pans along them. The view fills the whole 640x480 canvas
+  // (the placements below use the same 384x216 to 640x480 mapping), so nothing from the screen underneath, such as the title scene, shows through.
   function drawStoryBg(name) {
     const im = img['story:' + name] && img['story:' + name].im;
     g.imageSmoothingEnabled = false;
-    if (im) {                                                       // every scene background is prepared to native 640x480 before runtime
-      const range = Math.max(0, im.width - V.w), u = (SC[name] || {}).pan || 0;
-      const x0 = -Math.round(range * u);
-      g.drawImage(im, x0, 0);
-    }
-    else { g.fillStyle = '#100818'; g.fillRect(0, 0, V.w, V.h); }
+    g.fillStyle = '#100818'; g.fillRect(0, 0, V.w, V.h);
+    if (!im) return;
+    const u = (SC[name] || {}).pan || 0;
+    if (im.height >= V.h) { g.drawImage(im, -Math.round(Math.max(0, im.width - V.w) * u), 0); return; }   // already full size
+    const viewW = Math.min(im.width, 384), viewH = im.height;
+    const sx = Math.round(Math.max(0, im.width - viewW) * u);
+    g.drawImage(im, sx, 0, viewW, viewH, 0, 0, V.w, V.h);
   }
 
   // A silhouette of one sprite frame in one colour, cached.
