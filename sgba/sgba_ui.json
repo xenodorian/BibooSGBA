@@ -1,0 +1,8 @@
+{
+  "title": "Parry Perry",
+  "navigation": "game",
+  "hide": ["#btn-fullscreen", "text:Moves: Keyboard", "text:Moves: Mobile"],
+  "preload": [],
+  "image_budget_mb": 96,
+  "alpha": "threshold"
+}

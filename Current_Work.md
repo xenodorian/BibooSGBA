@@ -15,7 +15,7 @@ The goal here is a lighter, more efficient version of the game that is built to 
 | `web/` | The game. A plain static folder (`index.html`, scripts, `assets/`). It must run from any static web server with no build step. This is what Grok previews, what Pages publishes, and what SGBA runs. |
 | `swingkit/`, `tools/`, `data/`, `game/`, `requirements.txt` | The art and music generators and the data they use. `python -m swingkit --web` rebuilds `web/assets` (see `docs/ART_PIPELINE.md`). |
 | `tests/`, `web/tests/` | Python and Node regression tests. |
-| `sgba/` | SGBA-only settings and build recipe (added after the seed commit). |
+| `sgba/` | SGBA-only settings and build recipe: `sgba_ui.json` (device settings), `sgba.ref` (engine version), `build.py` (builds the Windows and ArkOS packages), `README.md`. |
 | `.github/workflows/pages.yml` | Publishes the site (a redirect at `/` and the game at `/web/`). |
 
 The old Dreamcast and MAME ports were removed on purpose and are not coming back. The old repo has them if ever needed.
@@ -70,6 +70,11 @@ The old Dreamcast and MAME ports were removed on purpose and are not coming back
 - Possible polish: per-attack reach for enemies, boss attack telegraphs, a boss unlock drop, a balance pass on boss damage.
 - Heavy Horizontal reuses the slash animation.
 
+## SGBA
+
+`python sgba/build.py` builds `dist/parry-perry-windows-x64.zip`, `dist/parry-perry-arkos-aarch64.zip` and `dist/parry-perry.sgba` from `web/` exactly as it is. CI (`.github/workflows/sgba.yml`) checks the game runs on SGBA and attaches the packages to each run. Device-only choices (hidden buttons, memory limit, preload lists) live in `sgba/sgba_ui.json`; see `sgba/README.md`. The packages leave out the MP3 music copies, MIDI files and web tests.
+
 ## Log
 
 - 2026-10-12: repository started clean from Biboo `5ec7d90` (stage 173). Removed `ports/` (Dreamcast and MAME), the root screenshots and `web/scale_compare*.png`; the old README became `docs/ART_PIPELINE.md`. All tools carried over.
+- 2026-10-12: added `sgba/` (settings, build script, CI). The SGBA packages build and the game starts directly in them.

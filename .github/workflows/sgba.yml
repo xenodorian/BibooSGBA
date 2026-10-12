@@ -1,0 +1,48 @@
+name: SGBA packages
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "web/**"
+      - "sgba/**"
+      - ".github/workflows/sgba.yml"
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Get the SGBA engine
+        run: |
+          ref=$(grep -v '^#' sgba/sgba.ref | head -1)
+          git clone --depth 1 --branch "$ref" https://github.com/xenodorian/SGBA .sgba-engine
+      - name: Check the game runs on SGBA
+        env:
+          SDL_VIDEODRIVER: dummy
+          SDL_AUDIODRIVER: dummy
+        run: |
+          python -m pip install pygame==2.6.1 quickjs-ng==0.17.0.1
+          python .sgba-engine/tools/sgba_check.py web
+
+  package:
+    needs: check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: sudo apt-get update && sudo apt-get install -y gcc-aarch64-linux-gnu
+      - name: Build Windows and ArkOS packages
+        run: python sgba/build.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: parry-perry-sgba
+          path: |
+            dist/*.zip
+            dist/*.sgba
