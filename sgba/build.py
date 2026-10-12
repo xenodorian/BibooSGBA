@@ -47,6 +47,8 @@ def main() -> int:
     for target in args.targets:
         command = [sys.executable, str(engine / "tools" / "build_bundle.py"), target, "--web", str(REPO / "web"), "--name", NAME,
                    "--ui-config", str(HERE / "sgba_ui.json"), "--out", str(args.out)]
+        if target.startswith("arkos"):           # the R36S pad mapping, captured on a real device; redo it from the pause menu if yours differs
+            command += ["--controls", str(HERE / "controls-arkos.json")]
         for pattern in EXCLUDE:
             command += ["--exclude", pattern]
         subprocess.run(command, check=True)
