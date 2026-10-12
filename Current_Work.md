@@ -78,3 +78,9 @@ The old Dreamcast and MAME ports were removed on purpose and are not coming back
 
 - 2026-10-12: repository started clean from Biboo `5ec7d90` (stage 173). Removed `ports/` (Dreamcast and MAME), the root screenshots and `web/scale_compare*.png`; the old README became `docs/ART_PIPELINE.md`. All tools carried over.
 - 2026-10-12: added `sgba/` (settings, build script, CI). The SGBA packages build and the game starts directly in them.
+
+## SGBA optimization passes (done)
+- Engine: fade baking, multiply blends honor alpha, `source-in` fills, horizontal shear (cast shadows), `SGBA.preload(urls)` hook (decodes one image per frame ahead of first draw; the game announces each map's enemy sheets in `09_maps.js`).
+- Measured (sgba/bench.py, desktop CPU ms/frame, before -> after): title 5.73 -> 4.81, level1 4.48 -> 3.07, level3 3.71 -> 2.48, level4 4.92 -> 3.71.
+- Not done on purpose: lossless PNG re-encode (saves ~10% disk only, no decode gain), parallax merge and sprite-sheet splitting (RLE already covers it; the 15411 px boarlord strip decodes to ~18 MB, a grid re-layout would need game code changes), rewriting draw code (flat profile, no function above 0.25 ms/frame).
+- Package leaves out 10 unreferenced source images (story/N_*.png are inputs to tools/prepare_story_assets.py).
