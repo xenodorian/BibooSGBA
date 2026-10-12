@@ -19,7 +19,9 @@ HERE = Path(__file__).resolve().parent
 REPO = HERE.parent
 NAME = "Parry Perry"
 # Files the browser needs but a device does not: MP3 copies of the Ogg music, MIDI sources, and the web tests.
-EXCLUDE = ["*.mp3", "*.mid", "tests/*", "*.test.js", ".DS_Store"]
+EXCLUDE = ["*.mp3", "*.mid", "tests/*", "*.test.js", ".DS_Store",
+           "assets/story/[0-9]_*.png",          # source art for tools/prepare_story_assets.py; the game uses assets/story/view/
+           "assets/moves/backstep_upswing.png", "assets/moves/energy_slash.png"]   # not referenced anywhere
 
 
 def engine_dir() -> Path:
