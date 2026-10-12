@@ -65,6 +65,7 @@
       if (!sf) for (const p of curMap.pits) { if (p.x1 <= d.x) lo = Math.max(lo, p.x1 + 2); else if (p.x0 >= d.x) hi = Math.min(hi, p.x0 - 2); }   // a ground enemy stays between the pits
       spawn(d.type, d.x, { fy: d.fy, path: d.path, sight: d.sight, key, lo, hi, lo0, hi0 });
     });
+    if (window.SGBA) window.SGBA.preload([...new Set(md.enemies.map(d => EN[d.type] && EN[d.type].sheet).filter(Boolean))]);   // SGBA runtime: decode this map's enemy art ahead of its first draw
     (md.leaves || []).forEach((l, i) => {                            // Leaves lying on the map: gone for good once picked up (until the level restarts)
       const key = idx + ':l' + i;
       if (!level.leafGot.has(key)) gems.push({ x: l.x, y: l.fy + l.h, fy: l.fy, kind: 'leaf', val: 1, perm: true, key, bob: Math.random() * 6.28, t0: clock });
