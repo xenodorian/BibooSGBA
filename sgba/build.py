@@ -42,10 +42,12 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("targets", nargs="*", default=["windows-x64", "arkos-aarch64"])
     parser.add_argument("--out", type=Path, default=REPO / "dist")
+    parser.add_argument("--native", action="store_true", help="build with the native (C) runtime instead of the Python one (needs: pip install ziglang)")
     args = parser.parse_args()
     engine = engine_dir()
     for target in args.targets:
-        command = [sys.executable, str(engine / "tools" / "build_bundle.py"), target, "--web", str(REPO / "web"), "--name", NAME,
+        script = "build_native_bundle.py" if args.native else "build_bundle.py"
+        command = [sys.executable, str(engine / "tools" / script), target, "--web", str(REPO / "web"), "--name", NAME,
                    "--ui-config", str(HERE / "sgba_ui.json"), "--out", str(args.out)]
         if target.startswith("arkos"):           # the R36S pad mapping, captured on a real device; redo it from the pause menu if yours differs
             command += ["--controls", str(HERE / "controls-arkos.json")]
