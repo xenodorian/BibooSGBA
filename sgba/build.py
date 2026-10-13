@@ -13,6 +13,7 @@ import argparse
 import os
 import subprocess
 import sys
+import zipfile
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -38,6 +39,31 @@ def engine_dir() -> Path:
     return target
 
 
+def make_port(out: Path) -> Path:
+    """The one package a handheld installs for this game: 'Parry Perry.sh' plus the game in its own folder.
+
+    The game folder is the contents of dist/parry-perry.sgba (a zip), so GitROMs can update it file by file. The emulator
+    itself (SGBA.sh and its sgba folder) is a separate package from the SGBA repo and holds no games.
+    """
+    source = out / "parry-perry.sgba"
+    target = out / "parry-perry-port.zip"
+    with zipfile.ZipFile(source) as game, zipfile.ZipFile(target, "w", zipfile.ZIP_DEFLATED, compresslevel=6) as port:
+        info = zipfile.ZipInfo(f"{NAME}.sh", (2026, 1, 1, 0, 0, 0))
+        info.compress_type = zipfile.ZIP_DEFLATED
+        info.external_attr = 0o755 << 16
+        info.create_system = 3
+        port.writestr(info, (HERE / f"{NAME}.sh").read_bytes())
+        for member in sorted(game.infolist(), key=lambda m: m.filename):
+            if member.is_dir():
+                continue
+            entry = zipfile.ZipInfo(f"parry-perry/{member.filename}", member.date_time)
+            entry.compress_type = zipfile.ZIP_DEFLATED
+            entry.external_attr = 0o644 << 16
+            entry.create_system = 3
+            port.writestr(entry, game.read(member))
+    return target
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("targets", nargs="*", default=["windows-x64", "arkos-aarch64"])
@@ -54,6 +80,8 @@ def main() -> int:
         for pattern in EXCLUDE:
             command += ["--exclude", pattern]
         subprocess.run(command, check=True)
+    if (args.out / "parry-perry.sgba").is_file():
+        print(f"built {make_port(args.out)}")
     return 0
 
 

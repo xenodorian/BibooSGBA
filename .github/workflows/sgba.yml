@@ -63,4 +63,5 @@ jobs:
           gh release view latest >/dev/null 2>&1 || gh release create latest \
             --title "Latest build" --notes "Rolling build, replaced on every publish." \
             --target "$GITHUB_SHA" --latest
-          gh release upload latest dist/*.sgba dist/*arkos*.zip --clobber
+          # One download path for the device: the game-only port. The standalone bundles stay as workflow artifacts.
+          gh release upload latest dist/parry-perry-port.zip --clobber
