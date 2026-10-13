@@ -40,27 +40,25 @@ def engine_dir() -> Path:
 
 
 def make_port(out: Path) -> Path:
-    """The one package a handheld installs for this game: 'Parry Perry.sh' plus the game in its own folder.
+    """The one package a handheld installs for this game: 'Parry Perry.sh' plus the single compiled game file.
 
-    The game folder is the contents of dist/parry-perry.sgba (a zip), so GitROMs can update it file by file. The emulator
-    itself (SGBA.sh and its sgba folder) is a separate package from the SGBA repo and holds no games.
+    The game is dist/parry-perry.sgba (one file) placed in its own folder, parry-perry-game/. The launcher starts the
+    separately installed SGBA emulator on that file. The emulator itself (SGBA.sh and its sgba folder) is a separate package
+    from the SGBA repo and holds no real games. The .sgba is already compressed, so it is stored as is.
     """
     source = out / "parry-perry.sgba"
     target = out / "parry-perry-port.zip"
-    with zipfile.ZipFile(source) as game, zipfile.ZipFile(target, "w", zipfile.ZIP_DEFLATED, compresslevel=6) as port:
+    with zipfile.ZipFile(target, "w", zipfile.ZIP_DEFLATED, compresslevel=6) as port:
         info = zipfile.ZipInfo(f"{NAME}.sh", (2026, 1, 1, 0, 0, 0))
         info.compress_type = zipfile.ZIP_DEFLATED
         info.external_attr = 0o755 << 16
         info.create_system = 3
         port.writestr(info, (HERE / f"{NAME}.sh").read_bytes())
-        for member in sorted(game.infolist(), key=lambda m: m.filename):
-            if member.is_dir():
-                continue
-            entry = zipfile.ZipInfo(f"parry-perry/{member.filename}", member.date_time)
-            entry.compress_type = zipfile.ZIP_DEFLATED
-            entry.external_attr = 0o644 << 16
-            entry.create_system = 3
-            port.writestr(entry, game.read(member))
+        entry = zipfile.ZipInfo("parry-perry-game/parry-perry.sgba", (2026, 1, 1, 0, 0, 0))
+        entry.compress_type = zipfile.ZIP_STORED
+        entry.external_attr = 0o644 << 16
+        entry.create_system = 3
+        port.writestr(entry, source.read_bytes())
     return target
 
 
