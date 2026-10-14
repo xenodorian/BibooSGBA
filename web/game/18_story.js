@@ -92,15 +92,18 @@
   }
 
   // A silhouette of one sprite frame in one colour, cached.
-  const _sil = {};
+  const _sil = new Map();                          // capped like _gameSil (see 15_draw_scenery.js)
   function silhouette(key, im, sx0, sy0, sw, sh, w, h, col) {
     const k = key + col;
-    if (_sil[k]) return _sil[k];
+    const hit = _sil.get(k);
+    if (hit) return hit;
     const c = document.createElement('canvas'); c.width = w; c.height = h;
     const x = c.getContext('2d'); x.imageSmoothingEnabled = false;
     x.drawImage(im, sx0, sy0, sw, sh, 0, 0, w, h);
     x.globalCompositeOperation = 'source-in'; x.fillStyle = col; x.fillRect(0, 0, w, h);
-    return (_sil[k] = c);
+    _sil.set(k, c);
+    if (_sil.size > 300) _sil.delete(_sil.keys().next().value);
+    return c;
   }
   const _scratch = document.createElement('canvas'); _scratch.width = 640; _scratch.height = 480;
   // Cast a shadow of the silhouette (drawn at dx, dy, standing on groundY) along the light L, laid flat on the ground.

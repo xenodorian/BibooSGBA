@@ -80,20 +80,25 @@
     const L = sceneLight();
     pixOval(x, y + 1, Math.max(3, rx * (0.55 + 0.45 * k)), Math.max(1, Math.round(3 * k)), L.col, (withCast ? 0.28 : 0.55) * k * Math.min(1, L.a + 0.2));
   }
-  const _gameSil = {};
+  // Silhouette canvases are cached per sprite frame, size and light colour. Sizes change with depth, so the key space is open ended:
+  // keep the newest few hundred (each is a small canvas, but on a handheld they add up over a long session).
+  const _gameSil = new Map(), SIL_MAX = 300;
   function gameSil(key, im, sx0, sy0, sw, sh, w, h, col, flip) {
     if (!im) return null;
     w = Math.max(1, w); h = Math.max(1, h);
     if (!flip) return silhouette(key, im, sx0, sy0, sw, sh, w, h, col);
     const k = key + col + '~f';
-    if (_gameSil[k]) return _gameSil[k];
+    const hit = _gameSil.get(k);
+    if (hit) return hit;
     const c = document.createElement('canvas'); c.width = w; c.height = h;
     const x = c.getContext('2d'); x.imageSmoothingEnabled = false;
     x.translate(w, 0); x.scale(-1, 1);
     x.drawImage(im, sx0, sy0, sw, sh, 0, 0, w, h);
     x.setTransform(1, 0, 0, 1, 0, 0);
     x.globalCompositeOperation = 'source-in'; x.fillStyle = col; x.fillRect(0, 0, w, h);
-    return (_gameSil[k] = c);
+    _gameSil.set(k, c);
+    if (_gameSil.size > SIL_MAX) _gameSil.delete(_gameSil.keys().next().value);
+    return c;
   }
   // Long shadow only on a flat floor. Clipped to a band around the feet so it cannot paint the sky.
   function castOnGround(sil, dx, dy, feetY, L, alpha) {
